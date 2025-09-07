@@ -15,9 +15,6 @@ class MessageDto {
 
   @IsString()
   content: string;
-
-  @IsISO8601()
-  timestamp: string; // e.g. "2025-09-06T20:30:12.143Z"
 }
 
 export class CreateConversationDto {
