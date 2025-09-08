@@ -1,14 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SUPABASE } from '../supabase/supabase.provider';
 @Injectable()
 export class ConversationsService {
-  private supabase: SupabaseClient;
-  constructor() {
-    this.supabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_KEY!,
-    );
+  constructor(@Inject(SUPABASE) private readonly supabase: SupabaseClient) {
   }
   async upsertConversation(dto: CreateConversationDto) {
     // 1. Check if conversation exists
