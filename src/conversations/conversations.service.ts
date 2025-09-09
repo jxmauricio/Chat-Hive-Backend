@@ -33,4 +33,21 @@ export class ConversationsService {
 
     return { conversationId: dto.conversationId, messages: data };
   }
+  //TODO: We are going to need to update this ot use user id as well
+  async getConversation(conversationId: string) {
+    const { data, error } = await this.supabase
+      .from('conversations')
+      .select(`
+        source,
+        conversation_link,
+        messages (
+          role,
+          content,
+          created_at
+        )
+      `)
+      .eq('id', conversationId)
+      .single();
+      return data
+}
 }
