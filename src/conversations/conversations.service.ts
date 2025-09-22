@@ -1,43 +1,79 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CreateConversationDto } from './dto/create-conversation.dto';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE } from '../supabase/supabase.provider';
+import OpenAI from 'openai';
 @Injectable()
 export class ConversationsService {
-  constructor(@Inject(SUPABASE) private readonly supabase: SupabaseClient) {
-  }
+  constructor(
+    @Inject(SUPABASE) private readonly supabase: SupabaseClient,
+    @Inject('OPENAI_CLIENT') private readonly openai: OpenAI,
+  ) {}
   async upsertConversation(dto: CreateConversationDto) {
-    // 1. Check if conversation exists
-    const { data: existing } = await this.supabase
+    // 1. Upsert conversation
+    const { error: convError } = await this.supabase
       .from('conversations')
-      .select('id')
-      .eq('id', dto.conversationId)
-      .single();
-    if (!existing) {
-      // Create conversation
-      const { error: convError } = await this.supabase
-        .from('conversations')
-        .insert([{ id: dto.conversationId, source: dto.source, }]);
-
-      if (convError) throw new Error(convError.message);
-    }
-
-    // 2. Insert messages
-    const { data, error } = await this.supabase
-      .from('messages')
-      .insert(
-        dto.messages.map((m) => ({ ...m, conversation_id: dto.conversationId })),
+      .upsert(
+        [
+          {
+            conversation_link: dto.conversationLink,
+            id: dto.conversationId,
+            source: dto.source,
+          },
+        ],
+        { onConflict: 'id' },
       );
 
-    if (error) throw new Error(error.message);
+    if (convError) throw new Error(convError.message);
+
+    // 2. Insert messages
+
+    var data = dto.messages.map(
+      async (m) =>
+        await this.storeMessageWithEmbedding(
+          m.role,
+          m.content,
+          dto.conversationId,
+        ),
+    );
 
     return { conversationId: dto.conversationId, messages: data };
   }
-  //TODO: We are going to need to update this ot use user id as well
+  async generateEmbedding(text: string): Promise<number[]> {
+    const response = await this.openai.embeddings.create({
+      model: 'text-embedding-ada-002',
+      input: text,
+    });
+
+    return response.data[0].embedding;
+  }
+  // Then store in Supabase with pgvector
+  async storeMessageWithEmbedding(
+    role: string,
+    message: string,
+    conversationId: string,
+  ) {
+    const embedding = await this.generateEmbedding(message);
+
+    const { data, error } = await this.supabase.from('messages').upsert(
+      {
+        role: role,
+        content: message,
+        conversation_id: conversationId,
+        embedding: embedding, // pgvector column
+      },
+      { onConflict: 'conversation_id,content' },
+    );
+
+    if (error) throw new Error(error.message);
+    return data;
+  }
+  //TODO: We are going to need to update this to use user id as well
   async getConversation(conversationId: string) {
     const { data, error } = await this.supabase
       .from('conversations')
-      .select(`
+      .select(
+        `
         source,
         conversation_link,
         messages (
@@ -45,9 +81,10 @@ export class ConversationsService {
           content,
           created_at
         )
-      `)
+      `,
+      )
       .eq('id', conversationId)
       .single();
-      return data
-}
+    return data;
+  }
 }
