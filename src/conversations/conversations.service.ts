@@ -28,14 +28,10 @@ export class ConversationsService {
 
     // 2. Insert messages
 
-    var data = dto.messages.map(
-      async (m) =>
-        await this.storeMessageWithEmbedding(
-          m.role,
-          m.content,
-          dto.conversationId,
-        ),
+    const promises = dto.messages.map((m) =>
+      this.storeMessageWithEmbedding(m.role, m.content, dto.conversationId),
     );
+    const data = await Promise.all(promises);
 
     return { conversationId: dto.conversationId, messages: data };
   }
@@ -53,17 +49,21 @@ export class ConversationsService {
     message: string,
     conversationId: string,
   ) {
+    //TODO: only embedd messages that need embedding (i.e. user messages)
     const embedding = await this.generateEmbedding(message);
 
-    const { data, error } = await this.supabase.from('messages').upsert(
-      {
-        role: role,
-        content: message,
-        conversation_id: conversationId,
-        embedding: embedding, // pgvector column
-      },
-      { onConflict: 'conversation_id,content' },
-    );
+    const { data, error } = await this.supabase
+      .from('messages')
+      .upsert(
+        {
+          role: role,
+          content: message,
+          conversation_id: conversationId,
+          embedding: embedding, // pgvector column
+        },
+        { onConflict: 'conversation_id,content' },
+      )
+      .select('content');
 
     if (error) throw new Error(error.message);
     return data;
