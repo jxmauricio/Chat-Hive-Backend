@@ -17,6 +17,7 @@ export class ConversationsService {
         [
           {
             conversation_link: dto.conversationLink,
+            title: dto.title,
             id: dto.conversationId,
             source: dto.source,
           },
@@ -42,7 +43,7 @@ export class ConversationsService {
     });
 
     return response.data[0].embedding;
-  }
+  } 
   // Then store in Supabase with pgvector
   async storeMessageWithEmbedding(
     role: string,
@@ -68,6 +69,28 @@ export class ConversationsService {
     if (error) throw new Error(error.message);
     return data;
   }
+  async getSimilarMessages(searchText: string){
+    const embedding = await this.generateEmbedding(searchText);
+    const { data: documents } = await this.supabase.rpc('match_messages', {
+      query_embedding: embedding, // pass the query embedding
+      match_threshold: 0.78, // choose an appropriate threshold for your data
+      match_count: 10, // choose the number of matches
+    });
+    console.log({documents})
+    return documents;
+  }
+
+  async getSimilarMessagesInConversation(searchText: string){
+    const embedding = await this.generateEmbedding(searchText);
+    const { data: documents } = await this.supabase.rpc('match_messages_per_conversation', {
+      query_embedding: embedding, // pass the query embedding
+      match_threshold: 0.78, // choose an appropriate threshold for your data
+      match_count: 10, // choose the number of matches
+    });
+    console.log({documents})
+    return documents;
+  }
+
   //TODO: We are going to need to update this to use user id as well
   async getConversation(conversationId: string) {
     const { data, error } = await this.supabase

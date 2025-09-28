@@ -13,4 +13,14 @@ export class ConversationsController {
     getConversation(@Query('id') conversationId: string) {
         return this.conversationsService.getConversation(conversationId);
     }
+
+    @Get('search-all-messages')
+    getSimilarMessages(@Query('searchInput') searchText: string) {
+        return this.conversationsService.getSimilarMessages(searchText);
+    }
+
+    @Get('search-messages-per-conversation')
+    getSimilarMessagesInConversation(@Query('searchInput') searchText: string) {
+        return this.conversationsService.getSimilarMessagesInConversation(searchText);
+    }
 }

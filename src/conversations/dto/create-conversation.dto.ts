@@ -20,7 +20,10 @@ class MessageDto {
 export class CreateConversationDto {
   @IsUUID()
   conversationId: string;
-
+  @IsString()
+  title: string;
+  @IsISO8601()
+  timestamp: string; // ISO 8601 format
   @IsString()
   source: string; // "chatgpt", "claude", etc.
   @IsString()
